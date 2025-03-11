@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Code Chunker</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Add highlight.js CSS for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
   <style>
     :root {
       --bg-primary: #121212;
@@ -17,6 +19,7 @@
       --border-color: #333;
       --success-color: #4ade80;
       --input-bg: #2a2a2a;
+      --code-bg: #282c34; /* VS Code-like code background */
     }
     
     * {
@@ -178,7 +181,7 @@
     
     .chunk.open .chunk-content {
       max-height: 500px; 
-      overflow-y: auto; 
+      overflow-y: auto;
     }
     
     .chunk.open .toggle-icon {
@@ -188,7 +191,8 @@
     .chunk-inner {
       position: relative;
       padding: 1.25rem;
-      padding-right: 4rem;
+      padding-right: 4rem; 
+      background-color: var(--code-bg); 
     }
     
     .chunk pre {
@@ -199,6 +203,14 @@
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 14px;
       line-height: 1.5;
+      background: transparent !important; 
+    }
+    
+
+    .chunk pre code {
+      background: transparent !important; 
+      padding: 0 !important;
+      width: 100%;
     }
     
     .copy-button-container {
@@ -284,7 +296,7 @@
       background: #555;
     }
     
-  
+
     .chunk-controls {
       display: flex;
       justify-content: flex-end;
@@ -313,6 +325,44 @@
       position: absolute;
       top: 12px;
       right: 12px;
+    }
+    
+
+    .line-numbers {
+      counter-reset: line;
+      position: absolute;
+      left: 0;
+      top: 1.25rem;
+      bottom: 1.25rem;
+      width: 2rem;
+      overflow: hidden;
+      border-right: 1px solid var(--border-color);
+      background-color: rgba(0, 0, 0, 0.1);
+      color: #6c7a89;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      user-select: none;
+      text-align: right;
+      padding-right: 0.5rem;
+    }
+
+    .with-line-numbers {
+      padding-left: 2.5rem !important;
+    }
+    
+
+    .language-indicator {
+      position: absolute;
+      top: 0;
+      right: 1.25rem;
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 0 0 4px 4px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
   </style>
 </head>
@@ -345,11 +395,44 @@
     <div id="output"></div>
   </div>
 
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/typescript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/java.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/csharp.min.js"></script>
+
   <script>
+
+    function detectLanguage(code) {
+
+      if (code.includes('import React') || code.includes('function(') || code.includes('const ') || code.includes('let ') || code.includes('var ')) {
+        return 'javascript';
+      } else if (code.includes('import ') && code.includes('from ') && (code.includes(': ') || code.includes('interface '))) {
+        return 'typescript';
+      } else if (code.includes('def ') || code.includes('import ') && !code.includes('from ')) {
+        return 'python';
+      } else if (code.includes('<html') || code.includes('<!DOCTYPE')) {
+        return 'html';
+      } else if (code.includes('class ') && code.includes('public ')) {
+        return 'java';
+      } else if (code.includes('{') && code.includes('}') && code.includes(';')) {
+        return 'cpp';
+      } else {
+        return ''; 
+      }
+    }
+    
+
     function copyText(elementId, button) {
       const element = document.getElementById(elementId);
       const text = element.innerText || element.textContent;
       
+
       if (!navigator.clipboard) {
         fallbackCopyTextToClipboard(text, button);
         return;
@@ -362,10 +445,12 @@
       });
     }
     
+
     function fallbackCopyTextToClipboard(text, button) {
       const textArea = document.createElement("textarea");
       textArea.value = text;
       
+
       textArea.style.position = "fixed";
       textArea.style.left = "-999999px";
       textArea.style.top = "-999999px";
@@ -479,7 +564,9 @@
       }
       
       const chunks = chunkCode(codeInput);
+      const detectedLang = detectLanguage(codeInput);
       
+
       const chunkControls = document.getElementById('chunkControls');
       chunkControls.style.display = chunks.length > 1 ? 'flex' : 'none';
       
@@ -488,10 +575,12 @@
         const chunkDiv = document.createElement('div');
         chunkDiv.classList.add('chunk');
         
+
         if (index === 0) {
           chunkDiv.classList.add('open');
         }
         
+
         const headerDiv = document.createElement('div');
         headerDiv.classList.add('chunk-header');
         headerDiv.innerHTML = `
@@ -511,6 +600,7 @@
         const innerDiv = document.createElement('div');
         innerDiv.classList.add('chunk-inner');
         
+
         const copyButtonContainer = document.createElement('div');
         copyButtonContainer.classList.add('copy-button-container');
         
@@ -526,15 +616,30 @@
         copyButtonContainer.appendChild(copyButton);
         innerDiv.appendChild(copyButtonContainer);
         
+        if (detectedLang) {
+          const langIndicator = document.createElement('div');
+          langIndicator.classList.add('language-indicator');
+          langIndicator.textContent = detectedLang;
+          innerDiv.appendChild(langIndicator);
+        }
+        
+
         const codeContent = document.createElement('pre');
-        codeContent.id = chunkId;
-        codeContent.textContent = chunk;
+        const codeElement = document.createElement('code');
+        if (detectedLang) {
+          codeElement.className = `language-${detectedLang}`;
+        }
+        codeElement.id = chunkId;
+        codeElement.textContent = chunk;
+        codeContent.appendChild(codeElement);
         innerDiv.appendChild(codeContent);
         
         contentDiv.appendChild(innerDiv);
         chunkDiv.appendChild(contentDiv);
         
         outputDiv.appendChild(chunkDiv);
+        
+        hljs.highlightElement(codeElement);
       });
       
       showStatusMessage(`Code split into ${chunks.length} chunk(s)`);

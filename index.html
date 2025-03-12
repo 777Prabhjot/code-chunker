@@ -221,6 +221,9 @@
       margin-right: -3rem;
       margin-top: 12px;
       z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     
     .copy-button {
@@ -503,11 +506,18 @@
     }
     
 
-    function copyChunk(chunkId, button) {
+    function copyChunk(chunkId, button, includePrompt = false) {
       const chunkElement = document.getElementById(chunkId);
       if (!chunkElement) return;
       
-      const text = chunkElement.innerText || chunkElement.textContent;
+      let text = chunkElement.innerText || chunkElement.textContent;
+      
+      // If includePrompt is true, append the instruction text after the chunk
+      if (includePrompt) {
+        const instructionText = document.getElementById("instructionText").innerText || 
+                              document.getElementById("instructionText").textContent;
+        text = text + "\n\n" + instructionText;
+      }
       
       if (!navigator.clipboard) {
         fallbackCopyTextToClipboard(text, button);
@@ -610,10 +620,19 @@
         copyButton.textContent = 'Copy';
         copyButton.onclick = function(e) {
           e.stopPropagation(); 
-          copyChunk(chunkId, this);
+          copyChunk(chunkId, this, false);
+        };
+        
+        const copyWithPromptButton = document.createElement('button');
+        copyWithPromptButton.classList.add('copy-button');
+        copyWithPromptButton.textContent = 'Copy w/ Prompt';
+        copyWithPromptButton.onclick = function(e) {
+          e.stopPropagation(); 
+          copyChunk(chunkId, this, true);
         };
         
         copyButtonContainer.appendChild(copyButton);
+        copyButtonContainer.appendChild(copyWithPromptButton);
         innerDiv.appendChild(copyButtonContainer);
         
         if (detectedLang) {

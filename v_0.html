@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Chunker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Add highlight.js CSS for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+  <style>
+    :root {
+      --bg-primary: #121212;
+      --bg-secondary: #1e1e1e;
+      --bg-tertiary: #252525;
+      --accent-color: #7c4dff;
+      --accent-hover: #9370ff;
+      --text-primary: #e0e0e0;
+      --text-secondary: #b0b0b0;
+      --border-color: #333;
+      --success-color: #4ade80;
+      --input-bg: #2a2a2a;
+      --code-bg: #282c34; /* VS Code-like code background */
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      background: var(--bg-secondary);
+      padding: 2rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+    
+    h1 {
+      text-align: center;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+      font-size: 2rem;
+      letter-spacing: -0.5px;
+    }
+    
+    label {
+      font-weight: 500;
+      display: block;
+      margin-bottom: 0.75rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    
+    textarea {
+      width: 100%;
+      height: 220px;
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--border-color);
+      background-color: var(--input-bg);
+      color: var(--text-primary);
+      box-sizing: border-box;
+      border-radius: 8px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      resize: vertical;
+      font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(124, 77, 255, 0.2);
+    }
+    
+    .button-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    button {
+      background-color: var(--accent-color);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(124, 77, 255, 0.3);
+    }
+    
+    button:hover {
+      background-color: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(124, 77, 255, 0.4);
+    }
+    
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 4px rgba(124, 77, 255, 0.4);
+    }
+    
+    button:disabled {
+      background-color: #444;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
+    #output {
+      margin-top: 1.5rem;
+    }
+    
+    .chunk, .instruction {
+      position: relative;
+      border: 1px solid var(--border-color);
+      margin-bottom: 1.25rem;
+      background-color: var(--bg-tertiary);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .instruction {
+      padding: 1.25rem;
+      background-color: rgba(124, 77, 255, 0.05);
+      border-left: 3px solid var(--accent-color);
+    }
+    
+
+    .chunk-header {
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1.25rem;
+      cursor: pointer;
+      background-color: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-color);
+      user-select: none;
+      transition: background-color 0.2s;
+    }
+    
+    .chunk-header:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .chunk-header .toggle-icon {
+      font-size: 1rem;
+      transition: transform 0.3s ease;
+    }
+    
+    .chunk-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    
+    .chunk.open .chunk-content {
+      max-height: 500px; 
+      overflow-y: auto;
+    }
+    
+    .chunk.open .toggle-icon {
+      transform: rotate(180deg);
+    }
+    
+    .chunk-inner {
+      position: relative;
+      padding: 1.25rem;
+      padding-right: 4rem; 
+      background-color: var(--code-bg); 
+    }
+    
+    .chunk pre {
+      white-space: pre-wrap;
+      overflow-x: auto;
+      margin: 0;
+      color: var(--text-primary);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      background: transparent !important; 
+    }
+    
+
+    .chunk pre code {
+      background: transparent !important; 
+      padding: 0 !important;
+      width: 100%;
+    }
+    
+    .copy-button-container {
+      position: sticky;
+      top: 0;
+      right: 0;
+      float: right;
+      margin-right: -3rem;
+      margin-top: 12px;
+      z-index: 10;
+    }
+    
+    .copy-button {
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.65rem;
+      cursor: pointer;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      color: var(--text-secondary);
+      box-shadow: none;
+      z-index: 10;
+    }
+    
+    .copy-button:hover {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: var(--text-primary);
+      transform: none;
+    }
+    
+    .copy-success {
+      background-color: var(--success-color) !important;
+      color: #121212 !important;
+    }
+    
+    .status-message {
+      text-align: center;
+      margin-top: 1rem;
+      color: var(--success-color);
+      font-weight: 500;
+      height: 20px;
+      opacity: 0.9;
+      transition: opacity 0.3s ease;
+    }
+    
+
+    .chunk:hover {
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+    }
+    
+
+    .main-button {
+      padding: 0.85rem 2.5rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+    }
+
+    #instructionText {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: var(--bg-tertiary);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+    
+
+    .chunk-controls {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+    
+    .control-button {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      box-shadow: none;
+    }
+    
+    .control-button:hover {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: var(--text-primary);
+      transform: none;
+      box-shadow: none;
+    }
+    
+
+    #instructionOutput .copy-button {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+    }
+    
+
+    .line-numbers {
+      counter-reset: line;
+      position: absolute;
+      left: 0;
+      top: 1.25rem;
+      bottom: 1.25rem;
+      width: 2rem;
+      overflow: hidden;
+      border-right: 1px solid var(--border-color);
+      background-color: rgba(0, 0, 0, 0.1);
+      color: #6c7a89;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      user-select: none;
+      text-align: right;
+      padding-right: 0.5rem;
+    }
+
+    .with-line-numbers {
+      padding-left: 2.5rem !important;
+    }
+    
+
+    .language-indicator {
+      position: absolute;
+      top: 0;
+      right: 1.25rem;
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 0 0 4px 4px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Code Chunker</h1>
+    <div id="instructionOutput" class="instruction">
+      <p id="instructionText">
+        Please do not provide any explanations, comments, or additional information about the code. Just read the code and wait for further instructions. Do not respond to anything else unless I provide further details. I will provide the next chunk in the following prompt.
+      </p>
+      <button class="copy-button" onclick="copyText('instructionText', this)">Copy</button>
+    </div>
+    
+    <label for="codeInput">Paste your code here:</label>
+    <textarea id="codeInput" placeholder="Enter your code..."></textarea>
+    
+    <div class="button-container">
+      <button class="main-button" onclick="chunkAndDisplay()">
+        Chunk Code
+      </button>
+    </div>
+    
+    <div class="status-message" id="statusMessage"></div>
+    
+    <div id="chunkControls" class="chunk-controls" style="display: none;">
+      <button class="control-button" onclick="expandAllChunks()">Expand All</button>
+      <button class="control-button" onclick="collapseAllChunks()">Collapse All</button>
+    </div>
+    
+    <div id="output"></div>
+  </div>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/typescript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/java.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/csharp.min.js"></script>
+
+  <script>
+
+    function detectLanguage(code) {
+
+      if (code.includes('import React') || code.includes('function(') || code.includes('const ') || code.includes('let ') || code.includes('var ')) {
+        return 'javascript';
+      } else if (code.includes('import ') && code.includes('from ') && (code.includes(': ') || code.includes('interface '))) {
+        return 'typescript';
+      } else if (code.includes('def ') || code.includes('import ') && !code.includes('from ')) {
+        return 'python';
+      } else if (code.includes('<html') || code.includes('<!DOCTYPE')) {
+        return 'html';
+      } else if (code.includes('class ') && code.includes('public ')) {
+        return 'java';
+      } else if (code.includes('{') && code.includes('}') && code.includes(';')) {
+        return 'cpp';
+      } else {
+        return ''; 
+      }
+    }
+    
+
+    function copyText(elementId, button) {
+      const element = document.getElementById(elementId);
+      const text = element.innerText || element.textContent;
+      
+
+      if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(text, button);
+        return;
+      }
+      
+      navigator.clipboard.writeText(text).then(() => {
+        showCopySuccess(button);
+      }).catch(err => {
+        fallbackCopyTextToClipboard(text, button);
+      });
+    }
+    
+
+    function fallbackCopyTextToClipboard(text, button) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          showCopySuccess(button);
+        } else {
+          showStatusMessage("Failed to copy. Please try again or copy manually.");
+        }
+      } catch (err) {
+        showStatusMessage("Failed to copy. Please try again or copy manually.");
+      }
+      
+      document.body.removeChild(textArea);
+    }
+    
+
+    function showCopySuccess(button) {
+      const originalText = button.textContent;
+      button.textContent = "Copied!";
+      button.classList.add("copy-success");
+      button.disabled = true;
+      
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove("copy-success");
+        button.disabled = false;
+      }, 2000);
+      
+      showStatusMessage("Copied to clipboard successfully!");
+    }
+    
+
+    function showStatusMessage(message) {
+      const statusElement = document.getElementById("statusMessage");
+      statusElement.textContent = message;
+      statusElement.style.opacity = "1";
+      
+      setTimeout(() => {
+        statusElement.style.opacity = "0";
+        setTimeout(() => {
+          statusElement.textContent = "";
+        }, 300);
+      }, 2700);
+    }
+    
+
+    function copyChunk(chunkId, button) {
+      const chunkElement = document.getElementById(chunkId);
+      if (!chunkElement) return;
+      
+      const text = chunkElement.innerText || chunkElement.textContent;
+      
+      if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(text, button);
+        return;
+      }
+      
+      navigator.clipboard.writeText(text).then(() => {
+        showCopySuccess(button);
+      }).catch(err => {
+        fallbackCopyTextToClipboard(text, button);
+      });
+    }
+    
+
+    function toggleChunk(element) {
+      element.classList.toggle('open');
+    }
+    
+
+    function expandAllChunks() {
+      document.querySelectorAll('.chunk').forEach(chunk => {
+        chunk.classList.add('open');
+      });
+    }
+    
+
+    function collapseAllChunks() {
+      document.querySelectorAll('.chunk').forEach(chunk => {
+        chunk.classList.remove('open');
+      });
+    }
+    
+
+    function chunkCode(code, maxLines = 300) {
+      const lines = code.split('\n');
+      const chunks = [];
+      
+      for (let i = 0; i < lines.length; i += maxLines) {
+        chunks.push(lines.slice(i, i + maxLines).join('\n'));
+      }
+      
+      return chunks;
+    }
+    
+
+    function chunkAndDisplay() {
+      const codeInput = document.getElementById('codeInput').value;
+      const outputDiv = document.getElementById('output');
+      outputDiv.innerHTML = '';
+      
+      if (!codeInput.trim()) {
+        showStatusMessage("No code entered.");
+        return;
+      }
+      
+      const chunks = chunkCode(codeInput);
+      const detectedLang = detectLanguage(codeInput);
+      
+
+      const chunkControls = document.getElementById('chunkControls');
+      chunkControls.style.display = chunks.length > 1 ? 'flex' : 'none';
+      
+      chunks.forEach((chunk, index) => {
+        const chunkId = `chunk-${index}`;
+        const chunkDiv = document.createElement('div');
+        chunkDiv.classList.add('chunk');
+        
+
+        if (index === 0) {
+          chunkDiv.classList.add('open');
+        }
+        
+
+        const headerDiv = document.createElement('div');
+        headerDiv.classList.add('chunk-header');
+        headerDiv.innerHTML = `
+          <span>Chunk ${index + 1} of ${chunks.length}</span>
+          <span class="toggle-icon">▼</span>
+        `;
+        headerDiv.onclick = function() {
+          toggleChunk(chunkDiv);
+        };
+        chunkDiv.appendChild(headerDiv);
+        
+
+        const contentDiv = document.createElement('div');
+        contentDiv.classList.add('chunk-content');
+        
+
+        const innerDiv = document.createElement('div');
+        innerDiv.classList.add('chunk-inner');
+        
+
+        const copyButtonContainer = document.createElement('div');
+        copyButtonContainer.classList.add('copy-button-container');
+        
+
+        const copyButton = document.createElement('button');
+        copyButton.classList.add('copy-button');
+        copyButton.textContent = 'Copy';
+        copyButton.onclick = function(e) {
+          e.stopPropagation(); 
+          copyChunk(chunkId, this);
+        };
+        
+        copyButtonContainer.appendChild(copyButton);
+        innerDiv.appendChild(copyButtonContainer);
+        
+        if (detectedLang) {
+          const langIndicator = document.createElement('div');
+          langIndicator.classList.add('language-indicator');
+          langIndicator.textContent = detectedLang;
+          innerDiv.appendChild(langIndicator);
+        }
+        
+
+        const codeContent = document.createElement('pre');
+        const codeElement = document.createElement('code');
+        if (detectedLang) {
+          codeElement.className = `language-${detectedLang}`;
+        }
+        codeElement.id = chunkId;
+        codeElement.textContent = chunk;
+        codeContent.appendChild(codeElement);
+        innerDiv.appendChild(codeContent);
+        
+        contentDiv.appendChild(innerDiv);
+        chunkDiv.appendChild(contentDiv);
+        
+        outputDiv.appendChild(chunkDiv);
+        
+        hljs.highlightElement(codeElement);
+      });
+      
+      showStatusMessage(`Code split into ${chunks.length} chunk(s)`);
+    }
+  </script>
+</body>
+</html>
